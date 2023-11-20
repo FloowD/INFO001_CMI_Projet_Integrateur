@@ -1,4 +1,4 @@
-# TP4 - Segmentation temps-réel semi-supervisée par distance d’histogramme de couleurs
+# Segmentation temps-réel semi-supervisée par distance d’histogramme de couleurs
 
 ## Avancé
 

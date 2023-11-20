@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <iostream>
 #include <algorithm>
+#include <cmath>
 #include <opencv2/core/utility.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -55,6 +56,20 @@ struct ColorDistribution {
         }
     return dist;
   }
+
+  // Utilise la distance de Bhattacharyya entre les deux distributions
+  // Sympa mais on s'en fout pour l'instant
+  float distance_Bhattacharyya(const ColorDistribution& other ) const
+  {
+    float somme = 0.0;
+    for( int i = 0; i < 8; i++ )
+      for( int j = 0; j < 8; j++ )
+        for( int k = 0; k < 8; k++ ){
+             somme += sqrt(data[ i ][ j ][ k ] * other.data[ i ][ j ][ k ]);
+        }
+
+    return -log(somme);
+  }
 };
 
 
@@ -74,9 +89,11 @@ float minDistance( const ColorDistribution& h,
                    const std::vector< ColorDistribution >& hists )
 {
     float min_dist = h.distance( hists[0] );
+    // float min_dist = h.distance_Bhattacharyya( hists[0] );
     for (int i = 1; i < hists.size(); i++)
     {
         float dist = h.distance( hists[i] );
+        // float dist = h.distance_Bhattacharyya( hists[i] );
         if ( dist < min_dist )
             min_dist = dist;
     }
@@ -130,6 +147,15 @@ std::vector< Vec3b > generateColors( int nb_colors )
 }
 
 
+//==============================================================================
+// Amélioration INFO001 CMI
+//==============================================================================
+//JPP le nom la
+
+
+
+
+
 int main( int argc, char** argv )
 {
   Mat img_input, img_seg, img_d_bgr, img_d_hsv, img_d_lab;
@@ -162,14 +188,22 @@ int main( int argc, char** argv )
   std::vector<std::vector<ColorDistribution>> all_col_hists; // histogrammes de couleurs
 
 
+
   namedWindow( "input", 1 );
   imshow( "input", img_input );
   bool freeze = false;
   Mat output = img_input;
   bool reco = false;
+  float dist;
+  bool add_dist;
   std::vector<Vec3b> colors;
+  double seuil = 5;
+  cv::createTrackbar( "distance distribution", "input", nullptr, 100.0,  NULL);
+  cv::setTrackbarPos( "distance distribution", "input", seuil ); // init à 0.05
   while ( true )
     {
+      seuil = getTrackbarPos( "distance distribution", "input" );
+      
       char c = (char)waitKey(50); // attend 50ms -> 20 images/s
       if ( pCap != nullptr && ! freeze )
         (*pCap) >> img_input;     // récupère l'image de la caméra
@@ -204,9 +238,22 @@ int main( int argc, char** argv )
       if (c == 'a')
       {
         ColorDistribution obj = getColorDistribution( img_input, pt1, pt2 );
-        col_hists_object.push_back( obj );
-        int nb_hists_object = col_hists_object.size();
-        cout << "nb_hists_object : " << nb_hists_object << endl;
+        // On compare la distance avec toutes les autres distributions 
+        add_dist = true;
+        for (int i = 0; i < col_hists_object.size(); i++)
+        {
+          dist = obj.distance( col_hists_object[i] );
+          if ( dist < seuil/100.0 )
+          {
+            add_dist = false;
+            break;
+          }
+        }
+        if ( add_dist ){
+          col_hists_object.push_back( obj );
+          int nb_hists_object = col_hists_object.size();
+          cout << "nb_hists_object : " << nb_hists_object << endl;
+        }
       }
       if(c == 'o'){
         all_col_hists.push_back(col_hists_object);
